@@ -1,6 +1,6 @@
 import numpy as np
 
-def save_point_cloud_as_ply(save_path:str, pcd:np.ndaeeay, rgb:np.ndaeeay=None) -> None:
+def save_point_cloud_as_ply(save_path:str, pcd:np.ndarray, rgb:np.ndarray=None) -> None:
     '''
     pcd: np.ndarray of shape (...,3)
     

@@ -1,6 +1,11 @@
 import numpy as np
 
-def save_point_cloud_as_ply(save_path, pcd, rgb=None):
+def save_point_cloud_as_ply(save_path:str, pcd:np.ndaeeay, rgb:np.ndaeeay=None) -> None:
+    '''
+    pcd: np.ndarray of shape (...,3)
+    
+    rgb(optional): np.ndarray of shape (...,3)
+    '''
 
     pcd = pcd.reshape((-1,3))
     if rgb is not None:

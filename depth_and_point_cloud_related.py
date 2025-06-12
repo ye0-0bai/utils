@@ -1,26 +1,30 @@
 import numpy as np
 
-def save_point_cloud_as_ply(save_path:str, pcd:np.ndarray, rgb:np.ndarray=None) -> None:
-    '''
-    pcd: np.ndarray of shape (...,3)
-    
-    rgb(optional): np.ndarray of shape (...,3)
-    '''
 
-    pcd = pcd.reshape((-1,3))
-    if rgb is not None:
-        rgb = rgb.reshape((-1,3))
+def save_point_cloud_as_ply(save_path:str, pcds:np.ndarray, rgbs:np.ndarray=None) -> None:
+    """
+    Save point cloud as ply.
+
+    Args:
+        save_path (str)
+        pcds (np.ndarray)
+        rgbs (np.ndarray, optional)
+    """
+
+    pcds = pcds.reshape((-1,3))
+    if rgbs is not None:
+        rgbs = rgbs.reshape((-1,3))
         
     header = (
         'ply\n'
         'format ascii 1.0\n'
-        f'element vertex {len(pcd)}\n'
+        f'element vertex {len(pcds)}\n'
         'property float x\n'
         'property float y\n'
         'property float z\n'
     )
     
-    if rgb is not None:
+    if rgbs is not None:
         header += (
             'property uint8 red\n'
             'property uint8 green\n'
@@ -33,19 +37,21 @@ def save_point_cloud_as_ply(save_path:str, pcd:np.ndarray, rgb:np.ndarray=None) 
         
         f.write(header)
         
-        if rgb is None:
-            np.savetxt(f, pcd, '%f %f %f', delimiter=' ')
+        if rgbs is None:
+            np.savetxt(f, pcds, '%f %f %f', delimiter=' ')
         else:
-            tmp = np.concatenate((pcd, rgb), axis=-1)
+            tmp = np.concatenate((pcds, rgbs), axis=-1)
             np.savetxt(f, tmp, '%f %f %f %d %d %d', delimiter=' ')
 
-def convert_depth_to_point_cloud(depth:np.ndarray, intrinsic:np.ndarray, scale:int=1) -> np.ndarray:
-    """Convert depth image(s) to 3D point cloud(s) using camera intrinsics.
+
+def convert_depth_to_point_cloud(depth:np.ndarray, intrinsic:np.ndarray, scale:float=1.0) -> np.ndarray:
+    """
+    Convert depth image(s) to 3D point cloud(s) using camera intrinsics.
 
     Args:
         depth (np.ndarray)
         intrinsic (np.ndarray)
-        scale (int, optional): Scaling factor to convert depth values to meters. Defaults to 1.
+        scale (float, optional): scaling factor to convert depth values to meters. Defaults to 1.0.
 
     Returns:
         np.ndarray: point cloud(s)
@@ -70,9 +76,40 @@ def convert_depth_to_point_cloud(depth:np.ndarray, intrinsic:np.ndarray, scale:i
     X = (u[None,...] - intrinsic[:,0,2][:,None,None]) * Z / intrinsic[:,0,0][:,None,None]
     Y = (v[None,...] - intrinsic[:,1,2][:,None,None]) * Z / intrinsic[:,1,1][:,None,None]
     
-    point_clouds = np.stack((X, Y, Z), axis=-1)
+    point_cloud = np.stack((X, Y, Z), axis=-1)
     
     if batched_input:
-        return point_clouds
+        return point_cloud
     else:
-        return point_clouds[0]
+        return point_cloud[0]
+    
+
+def transform_point_cloud(point_cloud:np.ndarray, RT:np.ndarray) -> np.ndarray:
+    """
+    Trasform point cloud(s) using rigid transformation matrix/matrices.
+
+    Args:
+        point_cloud (np.ndarray)
+        RT (np.ndarray): rigid transformation matrix/matrices
+    Returns:
+        np.ndarray: transformed point cloud(s)
+    """
+    
+    if RT.ndim == 2:
+        original_shape = point_cloud.shape
+        point_cloud = point_cloud.reshape((-1,3))
+        point_cloud_homogeneous = np.concatenate((point_cloud, np.ones_like(point_cloud[...,:1])), axis=-1)
+        point_cloud_homogeneous = point_cloud_homogeneous @ RT.T
+        transformed_point_cloud = point_cloud_homogeneous[...,:3]
+        transformed_point_cloud = transformed_point_cloud.reshape(original_shape)
+    elif RT.ndim == 3:
+        assert point_cloud.shape[0] == RT.shape[0], "Batch size of point cloud and transformation matrix must match."
+        assert point_cloud.ndim >= 3, "Point cloud must have at least 3 dimensions (B,N,3)."
+        original_shape = point_cloud.shape
+        point_cloud = point_cloud.reshape((point_cloud.shape[0], -1, 3))
+        point_cloud_homogeneous = np.concatenate((point_cloud, np.ones_like(point_cloud[...,:1])), axis=-1)
+        point_cloud_homogeneous = np.matmul(point_cloud_homogeneous, RT.transpose(0, 2, 1))
+        transformed_point_cloud = point_cloud_homogeneous[...,:3]
+        transformed_point_cloud = transformed_point_cloud.reshape(original_shape)
+        
+    return transformed_point_cloud

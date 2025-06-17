@@ -56,13 +56,17 @@ def convert_depth_to_point_cloud(depth:np.ndarray, intrinsic:np.ndarray, scale:f
     Returns:
         np.ndarray: point cloud(s)
     """
-    
-    batched_input = True
-    
+
     if depth.ndim == 2:
         batched_input = False
         depth = depth[None,...]
         intrinsic = intrinsic[None,...]
+    elif depth.ndim == 3:
+        batched_input = True
+        if intrinsic.ndim == 2:
+            intrinsic = intrinsic[None,...]
+    else:
+        raise NotImplementedError
         
     H, W = depth.shape[1], depth.shape[2]
     u,v = np.meshgrid(np.arange(W), np.arange(H), indexing='xy')
